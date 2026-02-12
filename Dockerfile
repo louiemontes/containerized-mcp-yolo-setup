@@ -17,7 +17,7 @@ COPY package.json ./
 RUN npm install
 COPY mcp-server.js ./
 
-# Create .claude.json with onboarding complete and MCP config
+# Create .claude.json with onboarding complete and MCP configs
 RUN echo '{ \
   "hasCompletedOnboarding": true, \
   "lastOnboardingVersion": "2.1.39", \
@@ -26,6 +26,13 @@ RUN echo '{ \
     "echo": { \
       "command": "node", \
       "args": ["/app/mcp-server.js"] \
+    }, \
+    "github": { \
+      "command": "npx", \
+      "args": ["-y", "@modelcontextprotocol/server-github"], \
+      "env": { \
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${AGENT_GITHUB_TOKEN}" \
+      } \
     } \
   } \
 }' > /home/claudeuser/.claude.json
