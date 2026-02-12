@@ -17,26 +17,21 @@ COPY package.json ./
 RUN npm install
 COPY mcp-server.js ./
 
-# Create .claude.json with onboarding complete and MCP configs
+# Create .claude.json with agentgate MCP connection
 RUN echo '{ \
   "hasCompletedOnboarding": true, \
   "lastOnboardingVersion": "2.1.39", \
   "theme": "dark", \
   "mcpServers": { \
-    "echo": { \
-      "command": "node", \
-      "args": ["/app/mcp-server.js"] \
-    }, \
-    "github": { \
-      "command": "npx", \
-      "args": ["-y", "@modelcontextprotocol/server-github"], \
-      "env": { \
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${AGENT_GITHUB_TOKEN}" \
+    "agentgate": { \
+      "type": "http", \
+      "url": "http://agentgate:3050/mcp", \
+      "headers": { \
+        "Authorization": "Bearer ${AGENTGATE_API_KEY}" \
       } \
     } \
   } \
 }' > /home/claudeuser/.claude.json
-
 # Create wrapper script
 RUN echo '#!/bin/bash\nclaude --dangerously-skip-permissions "$@"' > /usr/local/bin/c && \
     chmod +x /usr/local/bin/c

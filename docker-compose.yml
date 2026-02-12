@@ -1,12 +1,29 @@
 services:
+  agentgate:
+    image: node:22-slim
+    working_dir: /app
+    command: sh -c "npm install -g agentgate && agentgate"
+    ports:
+      - "3050:3050"
+    environment:
+      - AGENT_GITHUB_TOKEN=${AGENT_GITHUB_TOKEN}
+    volumes:
+      - agentgate-data:/root/.agentgate
+
   claude-code:
     build: .
     stdin_open: true
     tty: true
     environment:
       - ANTHROPIC_API_KEY
-      - AGENT_GITHUB_TOKEN
+      - AGENTGATE_URL=http://agentgate:3050
+      - AGENTGATE_API_KEY=${AGENTGATE_API_KEY}
     volumes:
       - ./workspace:/workspace
     working_dir: /workspace
     command: tail -f /dev/null
+    depends_on:
+      - agentgate
+
+volumes:
+  agentgate-data:
