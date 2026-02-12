@@ -5,6 +5,7 @@ services:
     tty: true
     environment:
       - ANTHROPIC_API_KEY
+      - AGENT_GITHUB_TOKEN
     volumes:
       - ./workspace:/workspace
     working_dir: /workspace
