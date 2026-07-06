@@ -5,13 +5,13 @@ services:
     tty: true
     environment:
       - ANTHROPIC_API_KEY
-      # All traffic must go through the allowlist proxy. Anything that
-      # ignores these vars has no route out anyway (internal network).
       - HTTP_PROXY=http://proxy:3128
       - HTTPS_PROXY=http://proxy:3128
       - http_proxy=http://proxy:3128
       - https_proxy=http://proxy:3128
-      - NO_PROXY=localhost,127.0.0.1
+      # mcp-gateway must NOT go through squid -- it's local traffic
+      - NO_PROXY=localhost,127.0.0.1,mcp-gateway
+      - no_proxy=localhost,127.0.0.1,mcp-gateway
     volumes:
       - ./workspace:/workspace
     working_dir: /workspace
@@ -40,7 +40,21 @@ services:
       - no-new-privileges:true
     mem_limit: 256m
 
+  mcp-gateway:
+    build: ./gateway
+    env_file: .env # AGENT_GITHUB_TOKEN lives here (gitignored)
+    restart: unless-stopped
+    networks:
+      - sandbox # reachable by the agent (tools only)
+      - egress # direct API access; trusted code, no allowlist
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    # NOTE: no ports published to the host on purpose
+
 networks:
   sandbox:
-    internal: true # containers here cannot reach the internet
+    internal: true # containers here cannot reach the internet, EXCEPT the mcp-gateway
   egress:
