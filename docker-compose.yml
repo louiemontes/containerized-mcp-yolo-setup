@@ -17,7 +17,7 @@ services:
     working_dir: /workspace
     command: tail -f /dev/null
     networks:
-      - sandbox            # internal-only: no direct internet
+      - sandbox # internal-only: no direct internet
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -28,16 +28,19 @@ services:
 
   proxy:
     image: ubuntu/squid:latest
+    user: proxy
+    entrypoint: ["squid", "-N", "-d", "1", "-f", "/etc/squid/squid.conf"]
+    restart: unless-stopped
     volumes:
       - ./squid.conf:/etc/squid/squid.conf:ro
     networks:
-      - sandbox            # reachable by claude-code
-      - egress             # has the actual internet
+      - sandbox
+      - egress
     security_opt:
       - no-new-privileges:true
     mem_limit: 256m
 
 networks:
   sandbox:
-    internal: true         # containers here cannot reach the internet
+    internal: true # containers here cannot reach the internet
   egress:
