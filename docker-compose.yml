@@ -5,8 +5,39 @@ services:
     tty: true
     environment:
       - ANTHROPIC_API_KEY
-      - AGENT_GITHUB_TOKEN
+      # All traffic must go through the allowlist proxy. Anything that
+      # ignores these vars has no route out anyway (internal network).
+      - HTTP_PROXY=http://proxy:3128
+      - HTTPS_PROXY=http://proxy:3128
+      - http_proxy=http://proxy:3128
+      - https_proxy=http://proxy:3128
+      - NO_PROXY=localhost,127.0.0.1
     volumes:
       - ./workspace:/workspace
     working_dir: /workspace
     command: tail -f /dev/null
+    networks:
+      - sandbox            # internal-only: no direct internet
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 4g
+    cpus: 4
+    pids_limit: 512
+
+  proxy:
+    image: ubuntu/squid:latest
+    volumes:
+      - ./squid.conf:/etc/squid/squid.conf:ro
+    networks:
+      - sandbox            # reachable by claude-code
+      - egress             # has the actual internet
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+
+networks:
+  sandbox:
+    internal: true         # containers here cannot reach the internet
+  egress:

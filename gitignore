@@ -1,0 +1,5 @@
+workspace/
+node_modules/
+.env
+*.env
+!example.env
