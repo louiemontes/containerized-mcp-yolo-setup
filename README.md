@@ -85,7 +85,7 @@ c  # Starts Claude Code
 ## Features
 
 - ✅ Isolated sandbox (only accesses `./workspace` directory)
-- ✅ MCP server example (echo tool)
+- ✅ MCP gateway example (`gateway/server.js`) for credential-isolated tool calls
 - ✅ Permissions bypassed via `--dangerously-skip-permissions`
 - ✅ Non-root user for security
 - ✅ One-command rebuild and exec
@@ -95,10 +95,11 @@ c  # Starts Claude Code
 Inside Claude Code:
 
 ```
-/mcp                           # View MCP servers
-Use the echo tool to say hi!   # Test the echo tool
+/mcp   # View MCP servers
 ```
 
 ## Adding More MCP Servers
 
-Edit the `mcpServers` section in Dockerfile's `.claude.json` creation.
+Edit the `mcpServers` section in Dockerfile's `.claude.json` creation. For a
+server that needs a secret, add a tool to `gateway/server.js` instead so the
+credential never reaches the agent container directly.

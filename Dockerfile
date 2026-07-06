@@ -19,12 +19,6 @@ RUN useradd -m -s /bin/bash claudeuser && \
     mkdir -p /home/claudeuser/.claude && \
     chown -R claudeuser:claudeuser /home/claudeuser
 
-# Set up local stdio MCP server (npm ci = lockfile-exact install)
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY mcp-server.js ./
-
 # .claude.json: onboarding complete + MCP config.
 # RULE: stdio entries here must be credential-free (they share the agent's
 # env), EXCEPT AGENT_GITHUB_TOKEN which the agent is trusted with directly
@@ -35,10 +29,6 @@ RUN echo '{ \
   "lastOnboardingVersion": "2.1.201", \
   "theme": "dark", \
   "mcpServers": { \
-    "echo": { \
-      "command": "node", \
-      "args": ["/app/mcp-server.js"] \
-    }, \
     "example-gateway": { \
       "type": "http", \
       "url": "http://mcp-gateway:8000/mcp" \
@@ -50,7 +40,7 @@ RUN echo '{ \
 RUN echo '#!/bin/bash\nclaude --dangerously-skip-permissions "$@"' > /usr/local/bin/c && \
     chmod +x /usr/local/bin/c
 
-RUN chown -R claudeuser:claudeuser /home/claudeuser /app
+RUN chown -R claudeuser:claudeuser /home/claudeuser
 
 USER claudeuser
 WORKDIR /workspace
