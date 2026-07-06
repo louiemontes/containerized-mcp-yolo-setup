@@ -38,22 +38,34 @@ You need an API key from Anthropic Console (not a Claude subscription):
 
 ## Setup
 
-1. Set your Anthropic API key in `.zshrc` (or `.bashrc`):
+1. Fill out the two env files (both gitignored) following the examples:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+agent.env
+gateway.env
 ```
 
-2. Reload your shell:
+- `agent.env` is loaded into the **claude-code** container. The agent can
+  read and act on anything in here with full agency (it runs with
+  `--dangerously-skip-permissions`) -- only put secrets you're fine
+  giving it maximum opportunity with, like your `ANTHROPIC_API_KEY` or a
+  fine-grained GitHub PAT scoped to a specific repo. Fill in
+  `ANTHROPIC_API_KEY` here (see [API Keys](https://console.anthropic.com/settings/keys)).
+- `gateway.env` is loaded into the **mcp-gateway** container only. The
+  agent ideally never sees these values directly -- it can only call the narrow
+  tools defined in `gateway/server.js`, which use the secret on the
+  agent's behalf.
 
-```bash
-source ~/.zshrc
-```
-
-3. Add alias to `.zshrc`:
+2. Add alias to `.zshrc`:
 
 ```bash
 alias cdev='docker-compose down && docker-compose build && docker-compose up -d && docker-compose exec claude-code bash'
+```
+
+3. Reload your shell:
+
+```bash
+source ~/.zshrc
 ```
 
 4. Clone this repo and run:
@@ -73,7 +85,7 @@ c  # Starts Claude Code
 ## Features
 
 - ✅ Isolated sandbox (only accesses `./workspace` directory)
-- ✅ MCP server example (echo tool)
+- ✅ MCP gateway example (`gateway/server.js`) for credential-isolated tool calls
 - ✅ Permissions bypassed via `--dangerously-skip-permissions`
 - ✅ Non-root user for security
 - ✅ One-command rebuild and exec
@@ -83,10 +95,11 @@ c  # Starts Claude Code
 Inside Claude Code:
 
 ```
-/mcp                           # View MCP servers
-Use the echo tool to say hi!   # Test the echo tool
+/mcp   # View MCP servers
 ```
 
 ## Adding More MCP Servers
 
-Edit the `mcpServers` section in Dockerfile's `.claude.json` creation.
+Edit the `mcpServers` section in Dockerfile's `.claude.json` creation. For a
+server that needs a secret, add a tool to `gateway/server.js` instead so the
+credential never reaches the agent container directly.

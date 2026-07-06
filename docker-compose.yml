@@ -3,8 +3,11 @@ services:
     build: .
     stdin_open: true
     tty: true
+    # agent.env: secrets the agent is trusted to use with full agency
+    # (e.g. AGENT_GITHUB_TOKEN). Never put a guarded secret here --
+    # see gateway.env / mcp-gateway below instead. (gitignored)
+    env_file: agent.env
     environment:
-      - ANTHROPIC_API_KEY
       - HTTP_PROXY=http://proxy:3128
       - HTTPS_PROXY=http://proxy:3128
       - http_proxy=http://proxy:3128
@@ -42,7 +45,10 @@ services:
 
   mcp-gateway:
     build: ./gateway
-    env_file: .env # AGENT_GITHUB_TOKEN lives here (gitignored)
+    # gateway.env: guarded secrets the agent must never see directly
+    # (e.g. EXAMPLE_API_KEY). Exposed to the agent only via the narrow
+    # tools defined in gateway/server.js. (gitignored)
+    env_file: gateway.env
     restart: unless-stopped
     networks:
       - sandbox # reachable by the agent (tools only)

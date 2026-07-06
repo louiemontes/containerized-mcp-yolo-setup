@@ -2,60 +2,64 @@
 // Credential-isolating MCP gateway.
 // This container holds the secrets. The agent container only gets a URL.
 // The agent can INVOKE these tools but can never READ the token --
+//
+// GitHub access is handled separately: the agent container talks to
+// GitHub directly through the squid proxy using AGENT_GITHUB_TOKEN (a
+// fine-grained PAT). Use this gateway for any *other* third-party API
+// where you'd rather keep the credential out of the agent entirely.
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
-const GITHUB_TOKEN = process.env.AGENT_GITHUB_TOKEN;
-if (!GITHUB_TOKEN) {
+const EXAMPLE_API_KEY = process.env.EXAMPLE_API_KEY;
+if (!EXAMPLE_API_KEY) {
   console.error(
-    "WARNING: AGENT_GITHUB_TOKEN is empty -- gateway will boot but tools will refuse. Check .env",
+    "WARNING: EXAMPLE_API_KEY is empty -- gateway will boot but tools will refuse. Check gateway.env",
   );
 }
 
 function buildServer() {
-  const server = new McpServer({ name: "gh-gateway", version: "1.0.0" });
+  const server = new McpServer({ name: "example-gateway", version: "1.0.0" });
 
-  // Example tool: deliberately narrow and read-only.
-  // Add more tools here; keep each one as small as you can live with.
+  // Placeholder tool: swap "api.example-widgets.com" for a real third-party
+  // API. Add more tools here; keep each one as small as you can live with.
   server.registerTool(
-    "list_my_repos",
+    "get_widget_status",
     {
-      description: "List the authenticated user's GitHub repos (read-only)",
+      description: "Look up a widget's status from the example third-party API (read-only)",
       inputSchema: {
-        limit: z.number().int().min(1).max(30).default(10),
+        widgetId: z.string().min(1),
       },
     },
-    async ({ limit }) => {
-      if (!GITHUB_TOKEN) {
+    async ({ widgetId }) => {
+      if (!EXAMPLE_API_KEY) {
         return {
           content: [
-            { type: "text", text: "Gateway has no AGENT_GITHUB_TOKEN set." },
+            { type: "text", text: "Gateway has no EXAMPLE_API_KEY set." },
           ],
         };
       }
       const resp = await fetch(
-        `https://api.github.com/user/repos?per_page=${limit}&sort=updated`,
+        `https://api.example-widgets.com/v1/widgets/${encodeURIComponent(widgetId)}`,
         {
           headers: {
-            Authorization: `Bearer ${GITHUB_TOKEN}`,
-            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${EXAMPLE_API_KEY}`,
+            Accept: "application/json",
             "User-Agent": "mcp-gateway",
           },
         },
       );
       if (!resp.ok) {
         return {
-          content: [{ type: "text", text: `GitHub API error: ${resp.status}` }],
+          content: [
+            { type: "text", text: `Example API error: ${resp.status}` },
+          ],
         };
       }
-      const repos = await resp.json();
-      const lines = repos.map(
-        (r) => `${r.full_name}${r.private ? " (private)" : ""}`,
-      );
+      const widget = await resp.json();
       return {
-        content: [{ type: "text", text: lines.join("\n") || "(no repos)" }],
+        content: [{ type: "text", text: JSON.stringify(widget) }],
       };
     },
   );
