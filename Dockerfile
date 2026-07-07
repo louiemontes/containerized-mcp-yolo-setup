@@ -64,6 +64,12 @@ RUN echo '{ \
   } \
 }' > /home/claudeuser/.claude.json
 
+# Agent commits are already attributed via AGENT_GIT_NAME/AGENT_GIT_EMAIL
+# (see entrypoint.sh) -- don't also stamp them with a Co-Authored-By trailer.
+RUN echo '{ \
+  "includeCoAuthoredBy": false \
+}' > /home/claudeuser/.claude/settings.json
+
 # Wrapper script
 RUN echo '#!/bin/bash\nclaude --dangerously-skip-permissions "$@"' > /usr/local/bin/c && \
     chmod +x /usr/local/bin/c
