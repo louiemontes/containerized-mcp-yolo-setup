@@ -47,6 +47,50 @@ RUN useradd -m -s /bin/bash claudeuser && \
 # over port 22 isn't on squid's allowlist anyway.
 RUN HOME=/home/claudeuser git config --global http.proxy http://proxy:3128
 
+# Global git hooks dir that auto-corrects a repo-local user.name/email
+# override that doesn't match AGENT_GIT_NAME/AGENT_GIT_EMAIL (set globally by
+# entrypoint.sh at runtime) -- otherwise a repo's own .git/config could
+# silently hijack commit attribution.
+# LIMITATIONS: core.hooksPath set globally here is shadowed by any repo that
+# sets its own local core.hooksPath (e.g. Husky-managed JS repos) -- those
+# repos won't get this protection. Also this only affects things going
+# forward (new commits/checkouts) -- a repo already checked out with a bad
+# override needs a fresh checkout, or a manual
+# `git config --local --unset user.name/user.email`, to fix immediately.
+RUN mkdir -p /home/claudeuser/.git-hooks && \
+    printf '%s\n' \
+      '#!/bin/sh' \
+      '# Strip a repo-local user.name/user.email override if it does not' \
+      '# match AGENT_GIT_NAME/AGENT_GIT_EMAIL, so commits fall back to the' \
+      '# global identity instead of silently using a repo-local override.' \
+      '' \
+      'if [ -n "$AGENT_GIT_NAME" ]; then' \
+      '  local_name=$(git config --local --get user.name 2>/dev/null)' \
+      '  if [ -n "$local_name" ] && [ "$local_name" != "$AGENT_GIT_NAME" ]; then' \
+      '    git config --local --unset-all user.name' \
+      '  fi' \
+      'fi' \
+      '' \
+      'if [ -n "$AGENT_GIT_EMAIL" ]; then' \
+      '  local_email=$(git config --local --get user.email 2>/dev/null)' \
+      '  if [ -n "$local_email" ] && [ "$local_email" != "$AGENT_GIT_EMAIL" ]; then' \
+      '    git config --local --unset-all user.email' \
+      '  fi' \
+      'fi' \
+      '' \
+      'exit 0' \
+      > /home/claudeuser/.git-hooks/fix-identity.sh && \
+    printf '%s\n' '#!/bin/sh' 'exec "$(dirname "$0")/fix-identity.sh"' \
+      > /home/claudeuser/.git-hooks/pre-commit && \
+    printf '%s\n' '#!/bin/sh' 'exec "$(dirname "$0")/fix-identity.sh"' \
+      > /home/claudeuser/.git-hooks/post-checkout && \
+    chmod +x /home/claudeuser/.git-hooks/fix-identity.sh \
+             /home/claudeuser/.git-hooks/pre-commit \
+             /home/claudeuser/.git-hooks/post-checkout
+
+# Register the hooks dir globally for the user that runs git commands.
+RUN HOME=/home/claudeuser git config --global core.hooksPath /home/claudeuser/.git-hooks
+
 # .claude.json: onboarding complete + MCP config.
 # RULE: stdio entries here must be credential-free (they share the agent's
 # env), EXCEPT AGENT_GITHUB_TOKEN which the agent is trusted with directly
