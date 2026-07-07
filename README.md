@@ -51,6 +51,9 @@ gateway.env
   giving it maximum opportunity with, like your `ANTHROPIC_API_KEY` or a
   fine-grained GitHub PAT scoped to a specific repo. Fill in
   `ANTHROPIC_API_KEY` here (see [API Keys](https://console.anthropic.com/settings/keys)).
+  Also set `AGENT_GIT_NAME`/`AGENT_GIT_EMAIL` -- these become the container's
+  `git config --global user.name`/`user.email` at startup, so commits the
+  agent makes are attributed to it rather than to you.
 - `gateway.env` is loaded into the **mcp-gateway** container only. The
   agent ideally never sees these values directly -- it can only call the narrow
   tools defined in `gateway/server.js`, which use the secret on the
