@@ -4,9 +4,21 @@ FROM node:22-slim
 ARG CLAUDE_CODE_VERSION=2.1.201
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
-# git for direct GitHub access (see squid.conf + AGENT_GITHUB_TOKEN)
+# git for direct GitHub access (see squid.conf + AGENT_GITHUB_TOKEN), plus a
+# fixed, user-independent Playwright toolkit: this installs the npm package
+# AND the matching Chromium build into /opt/browser-driver (own node_modules,
+# so ad-hoc driver scripts can `import { chromium } from 'playwright'` without
+# ever touching a project's package.json), with the browser binary cached at
+# PLAYWRIGHT_BROWSERS_PATH so it's readable regardless of which user runs.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /opt/browser-driver && \
+    cd /opt/browser-driver && \
+    npm init -y > /dev/null && \
+    npm install playwright && \
+    npx --no-install playwright install --with-deps chromium
+
 
 # Extra CLI tooling, plus GitHub CLI (not in Debian's default repos, so it's
 # added via GitHub's own apt repo). Uses normal build-time internet -- this
@@ -114,11 +126,54 @@ RUN echo '{ \
   "includeCoAuthoredBy": false \
 }' > /home/claudeuser/.claude/settings.json
 
+
+# Global skill: teaches the agent to use the pre-installed /opt/browser-driver
+# toolkit instead of npm-installing playwright inside whatever project it's
+# testing (which dirties that project's package.json/lock for no reason).
+RUN mkdir -p /home/claudeuser/.claude/skills/browser-driver && \
+    cat > /home/claudeuser/.claude/skills/browser-driver/SKILL.md << 'EOF'
+---
+name: browser-driver
+description: Drive a local dev server with headless Chromium via the pre-installed Playwright toolkit at /opt/browser-driver, for use when chromium-cli isn't available. Use whenever verifying a web app end-to-end in the browser.
+---
+
+## Toolkit location
+Playwright + Chromium are pre-installed at build time in `/opt/browser-driver`
+(own package.json + node_modules), browser cached at `/opt/ms-playwright`
+(`$PLAYWRIGHT_BROWSERS_PATH`). Never `npm install playwright` inside a
+project repo for this -- the toolkit already has it, and doing so dirties
+that project's package.json/lock for no reason.
+
+## How to drive a page
+1. Start the target project's dev server in the background; poll with curl
+    until it responds -- don't sleep-guess.
+2. Write a one-off driver script INTO the toolkit dir, e.g.
+    `/opt/browser-driver/drive-<project>.mjs` -- importing `{ chromium }`
+    from 'playwright' resolves fine there since node_modules sits alongside it.
+3. `node /opt/browser-driver/drive-<project>.mjs`
+4. Screenshot at each step. Check for errors via `page.on('console')` /
+    `page.on('pageerror')` before declaring success.
+5. Leave or delete the one-off script -- it's outside any project's git
+    history either way.
+
+## Skeleton
+```js
+import { chromium } from 'playwright'
+const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const page = await (await browser.newContext()).newPage()
+await page.goto('http://localhost:PORT/')
+// ...interact, screenshot...
+await browser.close()
+```
+EOF
+
+
+
 # Wrapper script
 RUN echo '#!/bin/bash\nclaude --dangerously-skip-permissions "$@"' > /usr/local/bin/c && \
     chmod +x /usr/local/bin/c
 
-RUN chown -R claudeuser:claudeuser /home/claudeuser
+RUN chown -R claudeuser:claudeuser /home/claudeuser /opt/browser-driver /opt/ms-playwright
 
 # Runs gh/git auth against AGENT_GITHUB_TOKEN on container start (the token
 # only exists at runtime via agent.env, not at build time).
