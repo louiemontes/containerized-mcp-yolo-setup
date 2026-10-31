@@ -59,6 +59,13 @@ RUN useradd -m -s /bin/bash claudeuser && \
 # over port 22 isn't on squid's allowlist anyway.
 RUN HOME=/home/claudeuser git config --global http.proxy http://proxy:3128
 
+# Rewrite SSH-style GitHub remotes to HTTPS at the git layer, so a repo
+# cloned/remote-added as git@github.com:... (common for host-mounted repos in
+# /workspace) still routes through squid + the gh credential helper instead
+# of failing with a misleading "Could not resolve hostname github.com".
+RUN HOME=/home/claudeuser git config --global url."https://github.com/".insteadOf "git@github.com:" && \
+    HOME=/home/claudeuser git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+
 # Global git hooks dir that auto-corrects a repo-local user.name/email
 # override that doesn't match AGENT_GIT_NAME/AGENT_GIT_EMAIL (set globally by
 # entrypoint.sh at runtime) -- otherwise a repo's own .git/config could
